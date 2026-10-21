@@ -1,0 +1,4 @@
+{
+  "required":false,"minVersion":"0.8.7","package":"dev.mcdn.frameprobe.mixin",
+  "compatibilityLevel":"JAVA_25","client":["FrameRenderMixin"],"injectors":{"defaultRequire":1}
+}

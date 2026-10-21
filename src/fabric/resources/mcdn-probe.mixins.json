@@ -1,0 +1,8 @@
+{
+  "required": false,
+  "minVersion": "0.8.7",
+  "package": "dev.mcdn.fabric.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["ClientTickMixin", "CollisionMixin"],
+  "injectors": {"defaultRequire": 1}
+}

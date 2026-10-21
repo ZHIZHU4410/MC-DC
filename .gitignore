@@ -1,0 +1,12 @@
+/research/upstream/
+/research/downloads/
+/local-config/
+**/bin/
+**/obj/
+**/.gradle/
+**/build/
+/artifacts/
+/logs/
+*.env
+.env*
+**/__pycache__/

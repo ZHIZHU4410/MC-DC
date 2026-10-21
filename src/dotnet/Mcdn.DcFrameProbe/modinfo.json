@@ -1,0 +1,5 @@
+{
+  "name":"McdnDcFrameProbe","version":"0.1.0","type":"mod","dccmversion":"35.13.9",
+  "description":"Isolated lab only: bounded recorded MC GPU frames in a native DC HUD texture. No input takeover.",
+  "assemblies":["Mcdn.DcFrameProbe.dll"],"main":"Mcdn.DcFrameProbe.FrameProbeMod","dependencies":["McdnDcProbe"]
+}

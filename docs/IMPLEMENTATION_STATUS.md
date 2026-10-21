@@ -1,0 +1,66 @@
+# 2026-10-19 实施记录（Asia/Shanghai）
+
+2026-10-21当前切片：[真实DC几何接入原生玩家](DC_SCENE_SLICE.md)实机通过。归档真实DC的2515格接入原生玩家；客户端200/服务器199采样，实际墙限位0.9499999881、跳跃峰值201.2522033403一致，输入/相机/原位原模式恢复通过。72个原生显示体、5张配对native tick的GPU图像及目视通过。仅独立实验实例备份替换；不计作实时DC操控、DC内显示或生产MODE通过。以下为历史切片。
+
+2026-10-20当前切片：[独立原生玩家物理测试](NATIVE_PHYSICS_SLICE.md)已完成真实和平世界验收及退出后归档复核。最终a7415741会话记录客户端200/服务器199个真实采样，墙限位2.25、自由跳高1.2522、低顶0.7000，170条输入消费及租约/原引用/相机/地面位置/模式恢复通过，原生退出码0。修复查询范围契约及空中恢复点，运行时磁盘核验在后台。本地脚本和合成场景不代表真实DC输入、生产MODE或完整物理隔离；原桥接实例/包未替换。以下为历史切片。
+
+2026-10-20最新实机：[实时完整场景诊断](LIVE_COLOR_SLICE.md)已通过626张MC真实GPU→类型隔离三槽邮箱→DC原生Texture/HUD上传及目视验收。DC前台时MC后台推进、两份诊断快照占用5秒不中断原生链路、主动停止后约1.49秒观察到清理。独立MCWC0.1不作为MCDF/MODE ready帧；尚未接入正式能力/上下文配对、DC三维视觉或原生输入接管。临时配置已解除、游戏正常退出，归档可独立复核。以下为历史切片。
+
+当前实机补充：[原生帧诊断](NATIVE_FRAME_PROBE.md)12张GPU图像已通过，包含最大化2560×1494→1024×598任意尺寸修复。[DC原生纹理诊断](DC_TEXTURE_SLICE.md)已完成12张记录图像的真实上传与角色场景目视显示，返回标题画面缩略图消失。邮箱测试与采集/回放仍是独立证据，未形成实时链路。
+
+2026-10-20最新组件：[v0.6 原生帧邮箱](FRAME_MAILBOX_SLICE.md)已编译并通过五项 Java25↔C# 实际跨进程测试，包括忙锁、槽复用、坏像素和持锁进程退出。使用合成 RGBA，尚未接入两款游戏的采集/显示。真实 DC→MC 地图修订与重开代次已另有实机证据。下文按历史切片阅读。
+
+本次从纯文档推进到可编译、可复现的协议切片。P0仅完成部分文件绑定；P1仅完成二进制codec和独立跨进程TCP验证，未全部通过。
+
+最新进展为 2026-10-20 的 [v0.5 实机诊断](DC_RUNTIME_SLICE.md)：真实 DC 地图局部 2555 个实体形状已在真实 MC 客户端/集成服务器匹配应用并被查询；7 格未支持，控制仍关闭。正常原生启动/存档保护与缺失加载器拒绝测试通过，原本地存档/配置零变化。尚无完整运动、输入接管或画面闭环。此前 [接入准备](LAB_SLICE.md)、[v0.4.0-world](WORLD_MODE_SLICE.md) 及管线夹具保留为分层证据。下文为历史切片记录。
+
+后续v0.3.0-control已完成Java25定位、实际MC输入/碰撞入口阅读、握手/输入故障释放与原生类型夹具，详见[CONTROL_SLICE.md](CONTROL_SLICE.md)。下文v0.2.0为上一切片记录，其中“下一切片”按新记录更新；不能把旧的未实现描述当当前状态。
+
+## 代码及证据
+
+| 产物 | 位置 | 已验证范围 |
+|---|---|---|
+| .NET10协议库 | src/dotnet/Mcdn.Protocol | 信封、拆包、身份/代次/序号过滤、不可变帧快照 |
+| Java协议库 | src/java/dev/mcdn/protocol | 相同布局及过滤；JDK21独立编译 |
+| 两语言测试端点 | tests/dotnet、tests/java | 独立进程，不连接游戏 |
+| 独立字节预言机及测试入口 | tools/verify_protocol.py | Python struct黄金字节；每语言39组样本；256条实际TCP往返 |
+| 文件环境检查 | tools/inspect_environment.py | 版本/JAR/class抽样/安装程序集指纹，不读账号令牌、不改安装 |
+| 执行报告 | artifacts/protocol/report.json、artifacts/environment.json | 运行结果与源码/样本SHA256；生成目录忽略提交 |
+
+检查包含：每个信封头切分点、连续两包合并、空body、1MiB边界、截断、超长/无符号长度、未知版本/type/flags、错误magic、错误会话/代次、重复/倒退序号和无符号最高位/最大值。解析失败后同一decoder不可复用。
+
+帧样本包含准确脚底xyz、nativeTick、consumedInputSeq、frameId、五项上下文配对；拒绝零/过大尺寸、错误stride/格式/alpha、保留位、NaN/Infinity、错误比例、时钟频率及像素CRC。CRC是诊断校验，不提供并发发布或认证保证。
+
+TCP测试的Java发送端构造256条不同UTF-8 body与高位序号，分段发送给C#；C#校验身份/序号、重新编码返回；Java逐包比较完整字节。双方独立进程通过临时回环端口通信。这里HEARTBEAT类型body是诊断样本，没有游戏语义、消费确认或认证；禁止把bench listener当正式桥接服务器。
+
+## 参考项目如何影响本次代码
+
+| 参考 | 本次采用原则 | 留给适配阶段的缺口 |
+|---|---|---|
+| minecraft-crossover-bridge | 帧像素与捕获时姿态/tick同一快照 | GPU捕获、动态纹理、三槽邮箱；不采用MC持焦点路径 |
+| DCCM | codec独立于HashLink；socket worker只提交数据 | 主线程Hook、Hero旁路/恢复、本机生成绑定 |
+| DC Multiplayer | 世界/控制代次与身份隔离 | 切关提交、实体注册和MC原生玩家 |
+| MineCells | 仅作内容映射参考 | 不复制素材或引入其单游戏架构 |
+| SkyCraft | 宿主生产输入、MC消费 | 输入边沿/松开、原生碰撞与DC三维渲染 |
+| ProtoInput | 区分设备路由与游戏原生消费 | 未引入通用输入注入依赖 |
+
+上游固定源码与链接沿用research/sources.json及GITHUB_RESEARCH.md。本次重读核心入口/帧采集片段，并访问SkyCraft协议、ProtoInput/crossover页面；未运行上游，也未将浮动main当新固定版本。
+
+## P0发现
+
+实际版本目录为`D:/MC/愚者/懒人包/.minecraft/versions/26.3-Fabric 0.20.0`。version JSON的KnotClient、Fabric Loader0.20.0和本地latest.log对应MC26.3；mods中有Fabric API0.164.0+26.3。配置要求Java25，JAR抽样`com/mojang/blaze3d/Blaze3D.class` major=69，与之相符。
+
+PATH上的Java/Javac为21.0.9，独立codec可用，不能据此编译/运行Java25游戏类；启动器实际运行时仍需定位。系统拒绝Win32_Process命令行查询，未提升权限。安装文件身份不等于运行游戏身份。
+
+DCCM版本文件为35.13.9；ModCore.dll、ModCore.Common.dll和缓存GameProxy.dll的SHA256在environment.json。MC游戏/loader/API也记录独立摘要。MDK/游戏build/加载代码一致性未核验。
+
+构建使用本项目空源NuGet.Config，无外部包。验证脚本为子进程设置项目内CLI_HOME/APPDATA，避开沙箱不可读的用户NuGet配置，不更改系统环境。
+
+## 下一切片与完成门槛
+
+1. 定位Java25开发运行时，核验26.3 Fabric真实输入及客户端/集成服务器碰撞入口；不降级MC，不用反复setPos模拟运动。
+2. 定义实现HELLO/能力/schema、nonce认证、消费ack、128条队列、输入边沿及本地超时释放。失败保持Hero，故障恢复须独立验证。
+3. 用JNI/PInvoke原生Win32库实现三槽映射和0ms锁；证明半写、忙锁、abandoned mutex和槽复用不会被显示。CRC测试不能替代同步验证。
+4. 在本机绑定上编译DC/MC进程内适配，再进入原生行走/跳跃/碰撞、真实帧与回切验收。
+
+当前无游戏帧、Hero接管、原生运动或延迟结果；P2–P6未通过。未安装、重启或操作游戏，未改ICEY工程、存档或系统输入设置。

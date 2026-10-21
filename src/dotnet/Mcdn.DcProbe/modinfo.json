@@ -1,0 +1,9 @@
+{
+  "name": "McdnDcProbe",
+  "version": "0.5.0",
+  "type": "mod",
+  "dccmversion": "35.13.9",
+  "assemblies": ["Mcdn.DcProbe.dll", "Mcdn.Protocol.dll"],
+  "main": "Mcdn.DcProbe.ProbeMod",
+  "dependencies": []
+}

@@ -1,0 +1,167 @@
+{
+  "research_date": "2026-10-19",
+  "timezone": "Asia/Shanghai",
+  "evidence_level": "static source reading; upstream projects not run",
+  "repositories": [
+    {
+      "repository": "justbustin/minecraft-crossover-bridge",
+      "commit": "d1723873ec8f370389cf19f74fac455b9e581321",
+      "checked_out_default_branch": true,
+      "read_files": [
+        {
+          "path": "elden-ring/er-bridge/include/bridge_protocol.h",
+          "sha256": "abdfc4d0ffd52d2f9ef24fc694f4ed7b6e7bcebf303a1bd8ea9a171bc467f8a0",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/er-bridge/include/bridge_protocol.h"
+        },
+        {
+          "path": "elden-ring/er-bridge/src/shm.cpp",
+          "sha256": "0f28193b811d70933707698e286c1270eb11d000bfb378f7b0b9a0c24310980f",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/er-bridge/src/shm.cpp"
+        },
+        {
+          "path": "elden-ring/er-bridge/src/frame.cpp",
+          "sha256": "d548317467fd9da43d1b652c5762ed32cd44d695d3cc6dbbee4870ec834854ae",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/er-bridge/src/frame.cpp"
+        },
+        {
+          "path": "docs/how-it-works.md",
+          "sha256": "dffc02db1b09154a4d4b32f92b0f28ed5669ab62ac49686ff3bd97688383786a",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/docs/how-it-works.md"
+        },
+        {
+          "path": "elden-ring/mc-bridge/src/client/java/dev/ermc/bridge/client/FramePassthrough.java",
+          "sha256": "a2ebb11a90a27d57982b07d0a5a69f12e2548200d0abe5d3b6b17b459f1b1089",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/mc-bridge/src/client/java/dev/ermc/bridge/client/FramePassthrough.java"
+        },
+        {
+          "path": "elden-ring/mc-bridge/src/client/java/dev/ermc/bridge/client/Overlay.java",
+          "sha256": "a18ef124cb2182a43e38d392c22c19b9d6bb805c73f5fd46d9342a29bb8ae843",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/mc-bridge/src/client/java/dev/ermc/bridge/client/Overlay.java"
+        },
+        {
+          "path": "elden-ring/mc-bridge/src/main/java/dev/ermc/bridge/link/ErLink.java",
+          "sha256": "796ad8c215e3df34aac1b77b735ec000867531926eb9abd0166b20a79cabdf88",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/mc-bridge/src/main/java/dev/ermc/bridge/link/ErLink.java"
+        },
+        {
+          "path": "elden-ring/mc-bridge/gradle.properties",
+          "sha256": "be66590190f3fb3b93f1c54234e7e98124d41adebd9936d13c6de3c7b7ddf2d0",
+          "source": "https://github.com/justbustin/minecraft-crossover-bridge/blob/d1723873ec8f370389cf19f74fac455b9e581321/elden-ring/mc-bridge/gradle.properties"
+        }
+      ]
+    },
+    {
+      "repository": "dead-cells-core-modding/core",
+      "commit": "343ee7ea8b90572e11999fd26c3efc1a9136f2de",
+      "checked_out_default_branch": true,
+      "read_files": [
+        {
+          "path": "README.md",
+          "sha256": "e5309cfa863e0176ea51b37e3d636342498caa87ef3f58af5e5f06d0a5dacda0",
+          "source": "https://github.com/dead-cells-core-modding/core/blob/343ee7ea8b90572e11999fd26c3efc1a9136f2de/README.md"
+        },
+        {
+          "path": "sources/ModCore/Modules/ModLoader.cs",
+          "sha256": "2ecf287a3ab75d778e4483f717a52f34fcd7017767b85f913d4116ee14abe7f3",
+          "source": "https://github.com/dead-cells-core-modding/core/blob/343ee7ea8b90572e11999fd26c3efc1a9136f2de/sources/ModCore/Modules/ModLoader.cs"
+        },
+        {
+          "path": "sources/ModCore.ModLoader.Default/DefaultModLoader.cs",
+          "sha256": "3dee25d0babf603782d0237f002396f058ce03b1e06fc5769a47302ae4d708b6",
+          "source": "https://github.com/dead-cells-core-modding/core/blob/343ee7ea8b90572e11999fd26c3efc1a9136f2de/sources/ModCore.ModLoader.Default/DefaultModLoader.cs"
+        },
+        {
+          "path": "sources/ModCore/Modules/Game.cs",
+          "sha256": "0cd58dcd2a096763e525b4586efebc01844c5843b9b7ebb51714206b7111d6ab",
+          "source": "https://github.com/dead-cells-core-modding/core/blob/343ee7ea8b90572e11999fd26c3efc1a9136f2de/sources/ModCore/Modules/Game.cs"
+        },
+        {
+          "path": "sources/ModCore/Mods/ModBase.cs",
+          "sha256": "a4fb35022bbe345f3b4011fa4696e75c25de2ca73d96f5661459610de543151f",
+          "source": "https://github.com/dead-cells-core-modding/core/blob/343ee7ea8b90572e11999fd26c3efc1a9136f2de/sources/ModCore/Mods/ModBase.cs"
+        },
+        {
+          "path": "sources/ModCore/Events/Interfaces/Game/IOnFrameUpdate.cs",
+          "sha256": "8d379cb9ecff1de7374dbe1aeb0497de6ba93289095bec4cf05d83ae5eaa8838",
+          "source": "https://github.com/dead-cells-core-modding/core/blob/343ee7ea8b90572e11999fd26c3efc1a9136f2de/sources/ModCore/Events/Interfaces/Game/IOnFrameUpdate.cs"
+        }
+      ]
+    },
+    {
+      "repository": "vaiserYT/DeadCellsMultiplayerMod",
+      "commit": "7ed82513b71a0d947d628764b0b72450be3e0aa8",
+      "checked_out_default_branch": true,
+      "read_files": [
+        {
+          "path": "README.md",
+          "sha256": "2bd7eeb5da8c4d10c4010c2dfa6f672c1170788fd0e662857ec1dd1ac7b82db0",
+          "source": "https://github.com/vaiserYT/DeadCellsMultiplayerMod/blob/7ed82513b71a0d947d628764b0b72450be3e0aa8/README.md"
+        },
+        {
+          "path": "server/server.NetNode.Protocol.Types.cs",
+          "sha256": "4a93edf2c393e48d91c3ca799946a8cb7080535e975b5a4343e884dd7b7bfa7f",
+          "source": "https://github.com/vaiserYT/DeadCellsMultiplayerMod/blob/7ed82513b71a0d947d628764b0b72450be3e0aa8/server/server.NetNode.Protocol.Types.cs"
+        },
+        {
+          "path": "UI/LevelExitSync.cs",
+          "sha256": "4dff67eae882750863e980abcb13068a4c0bed8c797d656824cb8c48018b24ae",
+          "source": "https://github.com/vaiserYT/DeadCellsMultiplayerMod/blob/7ed82513b71a0d947d628764b0b72450be3e0aa8/UI/LevelExitSync.cs"
+        },
+        {
+          "path": "GameDataSync/GameDataSync.LevelGraph.cs",
+          "sha256": "fd16f0e62b7611373cbcad074d7a994490e961d619c8f643fe3d3bef24f77c71",
+          "source": "https://github.com/vaiserYT/DeadCellsMultiplayerMod/blob/7ed82513b71a0d947d628764b0b72450be3e0aa8/GameDataSync/GameDataSync.LevelGraph.cs"
+        },
+        {
+          "path": "Mobs/MobWireCodec.cs",
+          "sha256": "af83ee87f0feda5052c37daca838c46d1abea3ffded9f03c7e5ceb8db330b081",
+          "source": "https://github.com/vaiserYT/DeadCellsMultiplayerMod/blob/7ed82513b71a0d947d628764b0b72450be3e0aa8/Mobs/MobWireCodec.cs"
+        }
+      ]
+    },
+    {
+      "repository": "mim1q/MineCells",
+      "commit": "317eac3152b23b5332dc12c2d69a919bca21a62b",
+      "checked_out_default_branch": true,
+      "read_files": [
+        {
+          "path": "README.md",
+          "sha256": "a067d795968c613eaf445c347836bd8783624159e130c0326726d43bd6b3f532",
+          "source": "https://github.com/mim1q/MineCells/blob/317eac3152b23b5332dc12c2d69a919bca21a62b/README.md"
+        },
+        {
+          "path": "gradle.properties",
+          "sha256": "7f3251960b8181fdfc9464ecd13d084d3e90979c832567c056f0a163eaaa38d2",
+          "source": "https://github.com/mim1q/MineCells/blob/317eac3152b23b5332dc12c2d69a919bca21a62b/gradle.properties"
+        },
+        {
+          "path": "src/main/java/com/github/mim1q/minecells/MineCells.java",
+          "sha256": "8f5bd175dd998a77e3b6a804d5b80c8a3eea7687f5777b0ab861335c66bbf139",
+          "source": "https://github.com/mim1q/MineCells/blob/317eac3152b23b5332dc12c2d69a919bca21a62b/src/main/java/com/github/mim1q/minecells/MineCells.java"
+        }
+      ]
+    }
+  ],
+  "supplemental": [
+    {
+      "url": "https://martianlee.github.io/posts/2026-10-08-passthrough-bridge-spectrum",
+      "scope": "classification/index; secondary source, author reports no game execution"
+    },
+    {
+      "url": "https://github.com/chasmlol/SkyCraft/blob/main/protocol/skycraft_protocol.h",
+      "scope": "primary protocol web reading: render ring, input ring, release-all; unpinned web snapshot"
+    },
+    {
+      "url": "https://github.com/BennettCode/Skyring/blob/main/protocol/schema/messages.toml",
+      "scope": "primary schema web reading; not full implementation audit"
+    },
+    {
+      "url": "https://github.com/Xu060113/SekiroCraft-Passthrough",
+      "scope": "README only; no game validation or full code audit"
+    },
+    {
+      "url": "https://github.com/Ilyaki/ProtoInput",
+      "scope": "README plus API reference search; input redirection category only"
+    }
+  ]
+}

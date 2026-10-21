@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "mcdn_lab_probe",
+  "version": "0.5.0",
+  "name": "MC-DC Isolated Lab Probe",
+  "environment": "client",
+  "entrypoints": {"client": ["dev.mcdn.fabric.FabricProbe"]},
+  "mixins": ["mcdn-probe.mixins.json"],
+  "depends": {"fabricloader": ">=0.20.0", "minecraft": "26.3", "java": ">=25"},
+  "description": "Read-only DC snapshot import into an explicitly marked isolated lab. Player takeover remains disabled."
+}

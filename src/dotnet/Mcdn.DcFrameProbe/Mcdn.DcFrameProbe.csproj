@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DccmRoot Condition="'$(DccmRoot)'==''">$(MSBuildThisFileDirectory)..\..\..\..</DccmRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Mcdn.FrameMailbox/FrameMailbox.cs" Link="Ipc/FrameMailbox.cs" />
+    <Compile Include="../Mcdn.Protocol/WorldColorFrame.cs" Link="Ipc/WorldColorFrame.cs" />
+    <Compile Include="../Mcdn.Protocol/Frame.cs" Link="Ipc/Frame.cs" />
+    <Compile Include="../Mcdn.Protocol/Control.cs" Link="Ipc/Control.cs" />
+    <Compile Include="../Mcdn.Protocol/Wire.cs" Link="Ipc/Wire.cs" />
+    <Reference Include="ModCore"><HintPath>$(DccmRoot)/core/host/ModCore.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ModCore.Common"><HintPath>$(DccmRoot)/core/host/ModCore.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="HaxeProxy"><HintPath>$(DccmRoot)/core/host/HaxeProxy.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="HashlinkSharp"><HintPath>$(DccmRoot)/core/host/HashlinkSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="GameProxy"><HintPath>../../../artifacts/lab/references/GameProxy.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Serilog"><HintPath>$(DccmRoot)/core/host/Serilog.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

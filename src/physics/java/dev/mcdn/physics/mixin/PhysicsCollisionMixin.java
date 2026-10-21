@@ -1,0 +1,16 @@
+package dev.mcdn.physics.mixin;
+import dev.mcdn.physics.PhysicsProbe;
+import net.minecraft.world.level.CollisionGetter;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.*;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.*;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@Mixin(CollisionGetter.class)
+public interface PhysicsCollisionMixin {
+    @Inject(method="getBlockCollisionsFromContext",at=@At("HEAD"),cancellable=true,require=1)
+    default void mcdn$physics(CollisionContext context,AABB box,CallbackInfoReturnable<Iterable<VoxelShape>> cir){
+        var shapes=PhysicsProbe.collision(this,context,box);if(shapes!=null)cir.setReturnValue(shapes);
+    }
+}
