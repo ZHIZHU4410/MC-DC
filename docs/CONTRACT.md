@@ -1,5 +1,7 @@
 # MC/DC 桥接契约入口
 
+2026-10-21 用户确认的画面边界：DC 窗口内为真实 DC 世界、敌人和交互；可见 MC 元素限于原生 UI、手臂与装备。MC 保有玩家模拟与渲染执行职责，不赋予其原世界视觉身份。[DC 外观切片](DC_VISUAL_WORLD_SLICE.md)先接入本机真实材质和世界层隔离；完整三维角色、敌人与双向交互仍须验收。以下早期状态文字须结合最新 IMPLEMENTATION_STATUS 阅读。
+
 权威布局及生命周期细节见 [PROTOCOL_DRAFT.md](PROTOCOL_DRAFT.md)，实现范围见 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)。这里不定义第二套协议。
 
 - 世界、关卡代次、前台输入与最终显示归 DC；原生玩家模拟、姿态与后续库存归 MC。F7 改所有权，不切操作系统焦点。

@@ -24,6 +24,7 @@ def main():
     report={"scope":"compiled actual DC/Heaps native HUD texture adapter; not native runtime/render evidence", "runtime_gameproxy_sha256":sha(ROOT.parent/"cache/GameProxy.dll"),
             "packages":{str(path.relative_to(ROOT)):sha(path) for path in sorted(package.iterdir())},
             "sources":{str(path.relative_to(ROOT)):sha(path) for path in sorted(project.parent.iterdir()) if path.is_file()},"linked_sources":{str(path.relative_to(ROOT)):sha(path) for path in [ROOT/"src/dotnet/Mcdn.FrameMailbox/FrameMailbox.cs",ROOT/"src/dotnet/Mcdn.Protocol/WorldColorFrame.cs",ROOT/"src/dotnet/Mcdn.Protocol/Frame.cs",ROOT/'src/dotnet/Mcdn.Protocol/Control.cs',ROOT/'src/dotnet/Mcdn.Protocol/Wire.cs']}}
+    report['linked_sources'][str((ROOT/'src/dotnet/Mcdn.Protocol/World.cs').relative_to(ROOT))]=sha(ROOT/'src/dotnet/Mcdn.Protocol/World.cs')
     (OUT/"build-report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
     print("DC_FRAME_PROBE_BUILD_PASS",package)
 

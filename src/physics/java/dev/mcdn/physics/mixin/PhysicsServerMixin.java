@@ -8,4 +8,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class PhysicsServerMixin {
     @Inject(method="tickServer",at=@At("TAIL"),require=1)
     private void mcdn$physicsServer(CallbackInfo ci){PhysicsProbe.serverTick((MinecraftServer)(Object)this);}
+    @Inject(method="stopServer",at=@At("HEAD"),require=1)
+    private void mcdn$physicsStop(CallbackInfo ci){PhysicsProbe.beforeServerStop((MinecraftServer)(Object)this);}
 }

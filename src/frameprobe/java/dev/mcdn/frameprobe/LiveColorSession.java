@@ -15,6 +15,8 @@ final class LiveColorSession implements AutoCloseable {
     final Path directory;
     final UUID session;
     final long expires;
+    final boolean viewControl;
+    final int maxEdge;
     private final Path map;
     private NativeMailbox mailbox;
     private long published;
@@ -30,6 +32,9 @@ final class LiveColorSession implements AutoCloseable {
     private LiveColorSession(JsonObject config,Path game,Path root)throws Exception {
         if(!config.get("kind").getAsString().equals("mcdn-live-world-color-diagnostic-1")||!Path.of(config.get("gameDir").getAsString()).toRealPath().equals(game)||config.get("eligibleForControl").getAsBoolean())throw new IllegalArgumentException("live diagnostic scope");
         directory=root;session=UUID.fromString(config.get("session").getAsString());expires=config.get("expiresUnixMs").getAsLong();
+        viewControl=config.has("inputLab")&&config.get("inputLab").getAsBoolean()&&config.has("viewControl")&&config.get("viewControl").getAsBoolean();
+        maxEdge=config.has("captureMaxEdge")?config.get("captureMaxEdge").getAsInt():512;
+        if(maxEdge<256||maxEdge>1024)throw new IllegalArgumentException("bounded native capture size");
         if(expires<=System.currentTimeMillis()||expires-System.currentTimeMillis()>900000)throw new IllegalArgumentException("live session expiry");
         map=Path.of(config.get("map").getAsString()).toRealPath();Path dll=Path.of(config.get("dll").getAsString()).toRealPath();
         if(!map.getParent().equals(directory)||!dll.getParent().equals(directory))throw new IllegalArgumentException("private session files required");
@@ -53,6 +58,9 @@ final class LiveColorSession implements AutoCloseable {
         if(!mailbox.publishWorldColor(WorldColorFrame.decode(packet)))return;
         var meta=new JsonObject();meta.addProperty("kind","live-native-mc-world-color-published");meta.addProperty("session",session.toString());meta.addProperty("frameId",Long.toUnsignedString(f.frameId()));meta.addProperty("streamEpoch",Long.toUnsignedString(f.streamEpoch()));
         meta.addProperty("nativeTick",Long.toUnsignedString(f.nativeGameTime()));meta.addProperty("width",image.getWidth());meta.addProperty("height",image.getHeight());meta.addProperty("rawSha256",hash(raw));meta.addProperty("packetSha256",hash(packet));meta.addProperty("captureQpc",f.captureQpc());meta.addProperty("readyQpc",readyQpc);meta.addProperty("eligibleForControl",false);
+        meta.addProperty("playerTick",f.playerTick());meta.addProperty("yaw",f.yaw());meta.addProperty("pitch",f.pitch());meta.addProperty("cameraType",f.cameraType());meta.addProperty("footX",f.footX());meta.addProperty("footY",f.footY());meta.addProperty("footZ",f.footZ());
+        meta.addProperty("screenType",f.screenType());
+        meta.addProperty("worldVisuals",f.worldVisuals());
         String encoded=new Gson().toJson(meta);Files.writeString(directory.resolve("producer.jsonl"),encoded+"\n",StandardOpenOption.CREATE,StandardOpenOption.APPEND);
         Files.writeString(directory.resolve("producer-latest.json.tmp"),encoded);
         try{Files.move(directory.resolve("producer-latest.json.tmp"),directory.resolve("producer-latest.json"),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}

@@ -11,8 +11,10 @@ import net.minecraft.world.phys.Vec2;
  */
 public final class BridgeClientInput extends ClientInput {
     private final InputInbox inbox;
-    public BridgeClientInput(InputInbox inbox) { this.inbox = java.util.Objects.requireNonNull(inbox); }
-    @Override public void tick() { inbox.tick(System.nanoTime(), this::install); }
+    private final java.util.function.IntUnaryOperator nativeGate;
+    public BridgeClientInput(InputInbox inbox) { this(inbox,java.util.function.IntUnaryOperator.identity()); }
+    public BridgeClientInput(InputInbox inbox,java.util.function.IntUnaryOperator nativeGate) { this.inbox = java.util.Objects.requireNonNull(inbox);this.nativeGate=java.util.Objects.requireNonNull(nativeGate); }
+    @Override public void tick() { inbox.tick(System.nanoTime(),held->{int filtered=nativeGate.applyAsInt(held);if((filtered&~127)!=0)throw new IllegalStateException("native input gate returned invalid mask");install(filtered);}); }
     private void install(int held) {
         keyPresses = new Input((held & 1) != 0, (held & 2) != 0, (held & 4) != 0, (held & 8) != 0,
             (held & 16) != 0, (held & 32) != 0, (held & 64) != 0);

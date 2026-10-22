@@ -23,7 +23,9 @@ public final class FrameProbe implements ClientModInitializer {
     record Frozen(long frameId,String dimension,long nativeGameTime,int playerTick,
         double footX,double footY,double footZ,double cameraX,double cameraY,double cameraZ,
         float yaw,float pitch,float partialTick,float[] viewRotation,float[] projection,
-        int sourceWidth,int sourceHeight,int downscale,String cameraType,long requestedNanos,long captureQpc,long streamEpoch) {}
+        int sourceWidth,int sourceHeight,int downscale,String cameraType,long requestedNanos,long captureQpc,long streamEpoch,String screenType,String worldVisuals) {}
+    private static java.util.function.Supplier<String> sceneLabel=()->"native-diagnostic";
+    public static void sceneLabel(java.util.function.Supplier<String> label){sceneLabel=Objects.requireNonNull(label);}
     private record Job(Frozen context,NativeImage image,long completedNanos,long readyQpc) {}
     private static Path game,output;
     private static volatile boolean configured;
@@ -35,6 +37,7 @@ public final class FrameProbe implements ClientModInitializer {
     private static LiveColorSession live;
     private static Object lastLevel;
     private static long streamEpoch,liveStarted;
+    private static final long LIVE_CAPTURE_LIMIT_NANOS=600_000_000_000L;
     @Override public void onInitializeClient() {
         String manifest=System.getProperty("mcdn.lab.manifest");if(manifest==null)return;
         try {
@@ -49,18 +52,18 @@ public final class FrameProbe implements ClientModInitializer {
             Files.createDirectories(output);
             live=LiveColorSession.read(game,output.getParent().getParent().getParent());configured=true;
             Thread worker=new Thread(FrameProbe::writeLoop,"MCDN-frame-files");worker.setDaemon(true);worker.start();
-            LOG.info("MCDN_FRAME_PROBE_INITIALIZED source={} output={}; limit={}; no input takeover",FrameProbe.class.getProtectionDomain().getCodeSource().getLocation(),output,live==null?"12 recorded frames":"180s live capture");
+            LOG.info("MCDN_FRAME_PROBE_INITIALIZED source={} output={}; limit={}; no input takeover",FrameProbe.class.getProtectionDomain().getCodeSource().getLocation(),output,live==null?"12 recorded frames":"600s live capture");
         }catch(Exception ex){LOG.error("MCDN frame probe disabled: {}",ex.toString());}
     }
     public static void afterRender(GameRenderer renderer) {
         if(!hookObserved){hookObserved=true;LOG.info("MCDN_FRAME_HOOK_OBSERVED thread={}; bounded diagnostic only",Thread.currentThread().getName());}
         if(!configured||failed||inFlight||(live==null&&requests>=12)||System.nanoTime()<next)return;
-        if(live!=null&&liveStarted!=0&&System.nanoTime()-liveStarted>180_000_000_000L){configured=false;LOG.info("MCDN_LIVE_COLOR_PRODUCER_STOPPED duration bound");return;}
+        if(live!=null&&liveStarted!=0&&System.nanoTime()-liveStarted>LIVE_CAPTURE_LIMIT_NANOS){configured=false;LOG.info("MCDN_LIVE_COLOR_PRODUCER_STOPPED duration bound");return;}
         try {
             RenderSystem.assertOnRenderThread();Minecraft mc=Minecraft.getInstance();
             if(mc.level==null||mc.player==null||mc.isPaused()||mc.getSingleplayerServer()==null||
                !mc.gameDirectory.toPath().toAbsolutePath().normalize().equals(game))return;
-            if(mc.player.getY()<captureMinY||(captureCameraType!=null&&mc.options.getCameraType()!=captureCameraType))return;
+            if(mc.player.getY()<captureMinY||(captureCameraType!=null&&!(live!=null&&live.viewControl)&&mc.options.getCameraType()!=captureCameraType))return;
             // MC26.3 actually writes/uses shouldRenderLevel. readyForLevelRendering is an unused,
             // never-written field in this exact game build and stays false even in a live world.
             var state=renderer.gameRenderState();if(!state.shouldRenderLevel)return;
@@ -88,13 +91,14 @@ public final class FrameProbe implements ClientModInitializer {
             for(float value:view)if(!Float.isFinite(value))return;
             for(float value:projection)if(!Float.isFinite(value))return;
             Frozen frozen=new Frozen(++id,level.dimension().toString(),levelState.gameTime,player.tickCount,foot.x,foot.y,foot.z,pos.x,pos.y,pos.z,
-                camera.yRot,camera.xRot,partial,view,projection,target.width,target.height,factor,cameraType,System.nanoTime(),live==null?0:NativeMailbox.qpc(),streamEpoch);
+                camera.yRot,camera.xRot,partial,view,projection,target.width,target.height,factor,cameraType,System.nanoTime(),live==null?0:NativeMailbox.qpc(),streamEpoch,mc.gui.screen()==null?"none":mc.gui.screen() instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen?"inventory":"other",sceneLabel.get());
             inFlight=true;requests++;if(liveStarted==0)liveStarted=System.nanoTime();next=System.nanoTime()+(live==null?2_000_000_000L:200_000_000L);
             Screenshot.takeScreenshot(target,factor,image->{
                 try {
                     RenderSystem.assertOnRenderThread();
                     if(!configured||failed||mc.level!=level||mc.player!=player||mc.getSingleplayerServer()!=server||
                        !mc.options.getCameraType().name().equals(cameraType)||
+                       !sceneLabel.get().equals(frozen.worldVisuals)||
                        target!=renderer.mainRenderTarget()||target.width!=frozen.sourceWidth||target.height!=frozen.sourceHeight||
                        System.nanoTime()-frozen.requestedNanos>5_000_000_000L) {image.close();return;}
                     Job replaced=ready.getAndSet(new Job(frozen,image,System.nanoTime(),live==null?0:NativeMailbox.qpc()));if(replaced!=null)replaced.image.close();
@@ -109,7 +113,7 @@ public final class FrameProbe implements ClientModInitializer {
             while(configured&&!session.stopped()){
                 Job job=ready.getAndSet(null);
                 if(job==null){Thread.sleep(10);continue;}
-                double scale=Math.min(1.0,512.0/Math.max(job.image.getWidth(),job.image.getHeight()));
+                double scale=Math.min(1.0,(double)session.maxEdge/Math.max(job.image.getWidth(),job.image.getHeight()));
                 int w=Math.max(1,(int)Math.round(job.image.getWidth()*scale)),h=Math.max(1,(int)Math.round(job.image.getHeight()*scale));
                 try(NativeImage source=job.image;NativeImage image=new NativeImage(source.format(),w,h,false)){
                     source.resizeSubRectTo(0,0,source.getWidth(),source.getHeight(),image);
@@ -139,6 +143,7 @@ public final class FrameProbe implements ClientModInitializer {
                 meta.addProperty("width",image.getWidth());meta.addProperty("height",image.getHeight());
                 meta.addProperty("fullScene",true);meta.addProperty("includesHud",true);meta.addProperty("playerLayer",false);meta.addProperty("eligibleForControl",false);
                 meta.addProperty("nativeDimension",f.dimension);meta.addProperty("bridgeContextPaired",false);
+                meta.addProperty("worldVisuals",f.worldVisuals);
                 meta.addProperty("note","native MC full-scene diagnostic; geometry provenance requires separate paired evidence; not a MODE/MCDF ready frame");
                 meta.addProperty("nativeGameTime",Long.toUnsignedString(f.nativeGameTime));meta.addProperty("nativePlayerTick",f.playerTick);
                 meta.addProperty("footX",f.footX);meta.addProperty("footY",f.footY);meta.addProperty("footZ",f.footZ);

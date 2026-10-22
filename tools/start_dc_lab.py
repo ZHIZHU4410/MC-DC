@@ -26,6 +26,8 @@ def main():
     game=Path(spec["cwd"]).resolve()
     if game!=LAB/"dc-game" or not (game/"MCDN_ISOLATED_DC_LAB").is_file():raise ValueError("lab path/marker mismatch")
     if sha(Path(spec["args"][0]))!=spec["shell_sha256"]:raise ValueError("DCCM shell changed")
+    for name,digest in spec.get('runtime_host_files',{}).items():
+        if sha(ROOT.parent/name)!=digest:raise ValueError('DCCM runtime dependency changed: '+name)
     for name,digest in spec["package_files"].items():
         if sha(LAB/name)!=digest:raise ValueError("DC probe package changed")
     for name,digest in spec["private_game_files"].items():

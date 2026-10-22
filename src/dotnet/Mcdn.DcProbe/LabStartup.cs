@@ -14,8 +14,8 @@ public static class LabStartup
         {
             if(Environment.GetEnvironmentVariable("MCDN_DC_ISOLATED_LAB")!="1")throw new InvalidOperationException("isolated startup flag required");
             // These listeners exist even when the default mod loader or the probe fails to load.
-            EventSystem.OnBeforeBroadcastEvent += Before;
-            _ = new FinalEntryGate(); // DCCM's OnAfterBroadcastEvent fires per receiver, not after the whole broadcast.
+            _ = new FirstEntryGuard();
+            _ = new FinalEntryGate();
             Console.Error.WriteLine("MCDN_DC_BOOTSTRAP_ARMED independent pre/post game-entry checks");
             var startup=typeof(ModCore.Module).Assembly.GetType("ModCore.Startup",true)!;
             var method=startup.GetMethod("StartGame",BindingFlags.Static|BindingFlags.Public)??throw new MissingMethodException("ModCore.Startup.StartGame");
@@ -23,9 +23,13 @@ public static class LabStartup
         }
         catch(Exception ex){Refuse(ex.GetBaseException().Message);}
     }
-    private static void Before(Type type,nint data)
+    private sealed class FirstEntryGuard : ModCore.Module,IOnBeforeGameInit
     {
-        if(type!=typeof(IOnBeforeGameInit))return;
+        public override int Priority => int.MinValue;
+        void IOnBeforeGameInit.OnBeforeGameInit() => Before();
+    }
+    private static void Before()
+    {
         try
         {
             string root=Environment.GetEnvironmentVariable("MCDN_LAB_ROOT")??throw new InvalidOperationException("lab root absent");

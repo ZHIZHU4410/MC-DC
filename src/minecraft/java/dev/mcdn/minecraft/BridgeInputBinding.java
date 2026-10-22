@@ -22,8 +22,11 @@ public final class BridgeInputBinding implements ModeGate.Binding {
     private ClientInput original;
     private boolean attempted, installed;
     public BridgeInputBinding(Slot slot, InputInbox inbox) {
+        this(slot,inbox,java.util.function.IntUnaryOperator.identity());
+    }
+    public BridgeInputBinding(Slot slot,InputInbox inbox,java.util.function.IntUnaryOperator nativeGate){
         this.slot = java.util.Objects.requireNonNull(slot); this.inbox = java.util.Objects.requireNonNull(inbox);
-        bridge = new BridgeClientInput(inbox);
+        bridge = new BridgeClientInput(inbox,nativeGate);
     }
     private void thread() { if (Thread.currentThread() != owner) throw new IllegalStateException("binding game thread only"); }
     @Override public boolean matches(World.Stamp stamp, long mode) {

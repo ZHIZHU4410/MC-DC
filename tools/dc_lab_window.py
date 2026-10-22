@@ -9,7 +9,8 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument("action",choices=["inspect","focus","close","capture","escape","enter","f3","f5","f7","minimize","show-inactive"]);group=p.add_mutually_exclusive_group();group.add_argument("--mc",action="store_true");group.add_argument("--physics",action="store_true");a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument("action",choices=["inspect","focus","close","capture","escape","enter","space","f3","f5","f7","minimize","show-inactive"]);p.add_argument("--hold-ms",type=int,default=50);group=p.add_mutually_exclusive_group();group.add_argument("--mc",action="store_true");group.add_argument("--physics",action="store_true");a=p.parse_args()
+    if not 50<=a.hold_ms<=500:raise ValueError("hold must be between 50 and 500 ms")
     lab=ROOT/"artifacts/lab";record_path=ROOT/"artifacts/physics/process.json" if a.physics else lab/("mc-live-process.json" if a.mc else "dc-process.json")
     record=json.loads(record_path.read_text(encoding="utf-8-sig"));a.mc=a.mc or a.physics
     if a.mc:
@@ -48,6 +49,9 @@ def main():
                 rows.append({"hwnd":int(hwnd),"title":title.value,"pid":pid.value,"created_at_ns":created})
             return True
         u.EnumWindows(visit,0)
+        # Windows IME may create an additional visible CiceroUIWndFrame for this PID.
+        # Select only the actual game title; still reject ambiguous game windows.
+        rows=[row for row in rows if row['title'].startswith('Minecraft')] if a.mc else [row for row in rows if row['title']=='Dead Cells with Core Modding']
         print(json.dumps(rows,ensure_ascii=True))
         if a.action!="inspect":
             if len(rows)!=1:raise ValueError("exactly one visible lab window required")
@@ -61,7 +65,7 @@ def main():
                 u.ShowWindowAsync.argtypes=[w.HWND,c.c_int]
                 u.ShowWindowAsync(hwnd,6 if a.action=="minimize" else 4)
                 print("MC_WINDOW_STATE",a.action)
-            elif a.action in {"escape","enter","f3","f5","f7"}:
+            elif a.action in {"escape","enter","space","f3","f5","f7"}:
                 if a.action in {"f3","f5"} and not a.mc:raise ValueError("debug/camera keys only allowed for MC")
                 import time
                 u.GetForegroundWindow.restype=w.HWND
@@ -74,9 +78,9 @@ def main():
                 class Input(c.Structure):_fields_=[("type",w.DWORD),("value",Union)]
                 u.SendInput.argtypes=[w.UINT,c.POINTER(Input),c.c_int]
                 def send(flags):
-                    value=Input(type=1,value=Union(keyboard=Keyboard(vk=0,scan={"f3":0x3d,"f5":0x3f,"f7":0x41,"escape":1,"enter":0x1c}[a.action],flags=flags)))
+                    value=Input(type=1,value=Union(keyboard=Keyboard(vk=0,scan={"f3":0x3d,"f5":0x3f,"f7":0x41,"escape":1,"enter":0x1c,"space":0x39}[a.action],flags=flags)))
                     if u.SendInput(1,c.byref(value),c.sizeof(value))!=1:raise c.WinError(c.get_last_error())
-                try:send(8);time.sleep(.05)
+                try:send(8);time.sleep(a.hold_ms/1000)
                 finally:send(8|2)
                 print("DC_FOREGROUND_ESCAPE_SCAN_SENT")
             elif a.action=="capture":

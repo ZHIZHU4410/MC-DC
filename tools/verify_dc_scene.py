@@ -17,21 +17,21 @@ def main():
     count=struct.unpack_from('<I',source,12)[0]
     for i in range(count):
         a=struct.unpack_from('<Q6dII',source,96+i*64);b=struct.unpack_from('<Q6dII',scene,96+i*64)
-        expected=(a[0],a[1],a[2]+plan['translation'][1],a[3],a[4],a[5]+plan['translation'][1],a[6],a[7],a[8])
+        expected=(a[0],*[a[k+1]+plan['translation'][k%3] for k in range(6)],a[7],a[8])
         if expected!=b:raise ValueError('original cell geometry/ID altered')
     # Reproduce from the frozen original, and exercise bad-source refusals without altering evidence.
     with tempfile.TemporaryDirectory(dir=OUT) as directory:
         directory=Path(directory);metadata=directory/'latest.json';blob=directory/meta['file']
         metadata.write_bytes((OUT/'source.json').read_bytes());blob.write_bytes(source)
-        if prepare(metadata)[2:]!=(scene,plan):raise ValueError('nonreproducible scene plan')
+        if prepare(metadata,plan.get('nativeBlocks',False))[2:]!=(scene,plan):raise ValueError('nonreproducible scene plan')
         bad_cases=[dict(meta,file='../outside.mcdw'),dict(meta,digest='0'*64)]
         for bad in bad_cases:
             metadata.write_text(json.dumps(bad))
-            try:prepare(metadata)
+            try:prepare(metadata,plan.get('nativeBlocks',False))
             except ValueError:pass
             else:raise ValueError('bad provenance accepted')
         metadata.write_bytes((OUT/'source.json').read_bytes());blob.write_bytes(source[:-1])
-        try:prepare(metadata)
+        try:prepare(metadata,plan.get('nativeBlocks',False))
         except ValueError:pass
         else:raise ValueError('truncated source accepted')
     build=json.loads((OUT/'build-report.json').read_text())

@@ -34,6 +34,12 @@ public final class NativeInputBench {
             Control.encodeInput(new Control.Input(1, 1, 1, 64, 64, 0))), System.nanoTime() - InputInbox.LEASE_NANOS));
         staleAdapter.tick(); check(staleAdapter.keyPresses.equals(net.minecraft.world.entity.player.Input.EMPTY));
         check(stale.consumedAck() == 1 && stale.fault().equals("stale-queued-input"));
+        var uiInbox=new InputInbox(peer,1,3);var allowMovement=new java.util.concurrent.atomic.AtomicBoolean(false);
+        var gated=new BridgeClientInput(uiInbox,h->allowMovement.get()?h:0);
+        check(uiInbox.receive(new Wire.Envelope(13,id,1,3,2,1,Control.encodeInput(new Control.Input(1,1,1,17,17,0))),System.nanoTime()));
+        gated.tick();check(gated.keyPresses.equals(net.minecraft.world.entity.player.Input.EMPTY)&&uiInbox.consumedInput()==1&&uiInbox.fault()==null);
+        allowMovement.set(true);gated.tick();check(gated.keyPresses.forward()&&gated.keyPresses.jump());
+        uiInbox.revoke("inventory-release");gated.tick();check(gated.keyPresses.equals(net.minecraft.world.entity.player.Input.EMPTY));
         System.out.println("MC_NATIVE_TYPES_PASS real 26.3 Input/ClientInput/Vec2: keys, normalized movement, revoke, stale lease");
     }
 }

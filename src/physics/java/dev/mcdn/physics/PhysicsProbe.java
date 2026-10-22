@@ -51,6 +51,7 @@ public final class PhysicsProbe implements ClientModInitializer {
     private static BridgeInputBinding binding;
     private static ClientInput original;
     private static CameraType camera;
+    private static net.minecraft.client.gui.screens.inventory.InventoryScreen ownedInventory;
     private static String leaseFault;
     // Server-owned state; the file worker never reads game objects.
     private static ServerPlayer serverPlayer;
@@ -58,6 +59,8 @@ public final class PhysicsProbe implements ClientModInitializer {
     private static float returnYaw,returnPitch;
     private static GameType returnMode;
     private static final List<Display.BlockDisplay> displays=new ArrayList<>();
+    private static final List<BlockPos> nativeBlocks=new ArrayList<>();
+    private static boolean shutdownReturn;
 
     @Override public void onInitializeClient(){
         String config=System.getProperty("mcdn.physics.manifest");if(config==null)return;
@@ -70,6 +73,11 @@ public final class PhysicsProbe implements ClientModInitializer {
             if(!fixture.stamp().digest().equals(cfg.get("fixtureSha256").getAsString()))throw new IllegalArgumentException("pinned fixture required");
             if(cfg.has("dcScene"))dcScene=new DcScene(JsonParser.parseString(Files.readString(Path.of(cfg.get("dcScene").getAsString()))).getAsJsonObject(),fixture);
             else if(fixture.boxes().size()>16)throw new IllegalArgumentException("large scene requires explicit DC provenance");
+            if(cfg.has("dcVisuals")){
+                if(dcScene==null||!dcScene.nativeBlocks)throw new IllegalArgumentException("DC visuals require native DC geometry");
+                DcVisuals.configure(Path.of(cfg.get("dcVisuals").getAsString()),cfg.get("dcVisualsSha256").getAsString(),fixture.stamp().digest(),game);
+                dev.mcdn.frameprobe.FrameProbe.sceneLabel(DcVisuals::description);
+            }
             if(cfg.has("inputManifest")){
                 if(dcScene==null)throw new IllegalArgumentException("input lab requires pinned DC scene");
                 control=new LabControlGuest(Path.of(cfg.get("inputManifest").getAsString()),cfg.get("inputManifestSha256").getAsString(),fixture);
@@ -77,7 +85,7 @@ public final class PhysicsProbe implements ClientModInitializer {
             Path parent=Path.of(cfg.get("output").getAsString()).toAbsolutePath().normalize();Files.createDirectories(parent);
             output=parent.resolve(UUID.randomUUID().toString());Files.createDirectory(output);configured=true;
             Thread worker=new Thread(PhysicsProbe::files,"MCDN-physics-files");worker.setDaemon(true);worker.start();
-            LOG.info("MCDN_PHYSICS_INITIALIZED source={} fixture={}; local script only, no DC/MODE takeover",getClass().getProtectionDomain().getCodeSource().getLocation(),fixture.stamp().digest());
+            LOG.info("MCDN_PHYSICS_INITIALIZED source={} fixture={}; inputSource={}; no production MODE",getClass().getProtectionDomain().getCodeSource().getLocation(),fixture.stamp().digest(),control==null?"local-script":"dc-foreground-input-lab");
         }catch(Exception ex){LOG.error("MCDN physics refused: {}",ex.toString());}
     }
     private static void files(){
@@ -103,10 +111,12 @@ public final class PhysicsProbe implements ClientModInitializer {
         event.addProperty("productionModeGranted",false);event.addProperty("fixtureSha256",fixture.stamp().digest());
         event.addProperty("geometrySource",dcScene==null?"synthetic-fixture":"archived-dc-solid-subset");
         event.addProperty("inputSource",control==null?"local-script":"dc-foreground-input-lab");
+        event.addProperty("geometryImplementation",dcScene!=null&&dcScene.nativeBlocks?"native-blocks":"query-shapes");
         if(dcScene!=null)event.addProperty("dcSourceDigest",dcScene.sourceDigest);
         if(queued.incrementAndGet()>2048){queued.decrementAndGet();failed=true;return;}events.add(event);
     }
     private static void install(Level level){
+        if(dcScene!=null&&dcScene.nativeBlocks)return; // Vanilla block state/shape queries own all collisions.
         var value=new Layer(level,playerId,new BridgeGeometry(fixture),new AtomicLong());value.geometry.applied();
         layers.updateAndGet(old->{var list=new ArrayList<Layer>();for(var e:old)if(e.level!=level)list.add(e);list.add(value);return List.copyOf(list);});
     }
@@ -149,7 +159,17 @@ public final class PhysicsProbe implements ClientModInitializer {
                     var pos=new BlockPos(x,y,z);
                     if(!player.level().getBlockState(pos).isAir()||!player.level().getFluidState(pos).isEmpty())throw new IllegalStateException("DC scene overlaps native blocks/fluids");
                 }
-            for(var box:dcScene==null?fixture.boxes():DcScene.displayRuns(fixture)){
+            if(dcScene!=null&&dcScene.nativeBlocks){
+                var targets=new LinkedHashSet<BlockPos>();
+                for(var b:fixture.boxes())for(int x=(int)b.minX();x<(int)b.maxX();x++)for(int y=(int)b.minY();y<(int)b.maxY();y++)for(int z=(int)b.minZ();z<(int)b.maxZ();z++)targets.add(new BlockPos(x,y,z));
+                if(targets.size()!=dcScene.nativeBlockCount)throw new IllegalStateException("native block count/overlap mismatch");
+                // Preflight every target before touching any block. This dedicated region must be air.
+                for(var pos:targets)if(!server.overworld().getBlockState(pos).isAir()||!server.overworld().getFluidState(pos).isEmpty()||server.overworld().getBlockEntity(pos)!=null)throw new IllegalStateException("native region is not pristine air");
+                nativeBlocks.addAll(targets); // Rollback ledger exists before the first native mutation.
+                for(var pos:nativeBlocks)if(!server.overworld().setBlock(pos,Blocks.STONE.defaultBlockState(),3))throw new IllegalStateException("native block materialization failed");
+                var event=new JsonObject();event.addProperty("kind","native-blocks-installed");event.addProperty("blocks",nativeBlocks.size());event.addProperty("collisionOverride",false);emit(event);
+            }
+            for(var box:dcScene!=null&&dcScene.nativeBlocks?List.<World.Box>of():dcScene==null?fixture.boxes():DcScene.displayRuns(fixture)){
                 var display=new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY,player.level());
                 ((BlockDisplayAccess)(Object)display).mcdn$block((box.id()==2?Blocks.GOLD_BLOCK:box.id()==3?Blocks.GLASS:Blocks.STONE).defaultBlockState());
                 ((DisplayAccess)(Object)display).mcdn$transform(new Transformation(new Vector3f(),new Quaternionf(),new Vector3f((float)(box.maxX()-box.minX()),(float)(box.maxY()-box.minY()),(float)(box.maxZ()-box.minZ())),new Quaternionf()));
@@ -164,7 +184,7 @@ public final class PhysicsProbe implements ClientModInitializer {
     }
     private static void start(Minecraft mc){
         if(control!=null){
-            inbox=Objects.requireNonNull(control.inbox());original=mc.player.input;binding=new BridgeInputBinding(BridgeInputBinding.slot(mc.player),inbox);
+            inbox=Objects.requireNonNull(control.inbox());original=mc.player.input;binding=new BridgeInputBinding(BridgeInputBinding.slot(mc.player),inbox,held->mc.gui.screen()==null?held:0);
             if(camera==null)camera=mc.options.getCameraType();mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
             if(!binding.enter())throw new IllegalStateException("native external input install failed");phase=0;
             LOG.info("MCDN_NATIVE_INPUT_LAB_INSTALLED actual DC foreground input channel; production MODE not granted");return;
@@ -186,6 +206,7 @@ public final class PhysicsProbe implements ClientModInitializer {
         return 0;
     }
     private static void release(Minecraft mc){
+        if(ownedInventory!=null){if(mc.gui.screen()==ownedInventory)mc.gui.setScreen(null);ownedInventory=null;}
         if(binding!=null&&!released){if(!binding.release())throw new IllegalStateException("original input restore pending");released=true;}
         if(camera!=null)mc.options.setCameraType(camera);
     }
@@ -201,18 +222,21 @@ public final class PhysicsProbe implements ClientModInitializer {
         if(!configured||finished)return;
         try{
             var server=mc.getSingleplayerServer();
-            if(mc.level==null||mc.player==null||server==null){if(setupRequested){release(mc);failed=true;finished=true;restore.set(true);}return;}
+            if(mc.level==null||mc.player==null||server==null){DcVisuals.release();if(setupRequested){release(mc);failed=true;finished=true;restore.set(true);}return;}
             if(!mc.gameDirectory.toPath().toAbsolutePath().normalize().equals(game))return;
-            if(failed){release(mc);restore.set(true);if(serverRestored)finished=true;return;}
+            if(failed){DcVisuals.release();release(mc);restore.set(true);if(serverRestored)finished=true;return;}
             if(!worldPreparationRequested){if(!savePathVerified)return;worldPreparationRequested=true;playerId=mc.player.getUUID();server.execute(()->prepareWorld(server));return;}
             if(!setupRequested){
                 if(!worldPrepared||!mc.player.isAlive()||mc.player.tickCount<20||!mc.player.onGround()){originWarm=0;return;}
                 if(++originWarm<10)return;
-                setupRequested=true;server.execute(()->setupServer(server));return;
+                DcVisuals.verifyResources(mc);setupRequested=true;server.execute(()->setupServer(server));return;
             }
             if(!serverReady)return;
-            if(!clientInstalled){install(mc.level);clientInstalled=true;}
-            if(serverRestored){remove(mc.level);if(++restoredTicks>=10){var end=sample("client-restored",mc.player);end.addProperty("kind","restored");end.addProperty("inputIdentityRestored",original==mc.player.input);end.addProperty("cameraRestored",camera==mc.options.getCameraType());emit(end);if(control!=null)control.publish("restored",mc.player.tickCount,mc.player.getX(),mc.player.getY(),mc.player.getZ(),original==mc.player.input);finished=true;}return;}
+            if(!clientInstalled){install(mc.level);clientInstalled=true;DcVisuals.activate();emit(DcVisuals.evidence());}
+            if(serverRestored){DcVisuals.release();remove(mc.level);if(++restoredTicks>=10){var end=sample("client-restored",mc.player);end.addProperty("kind","restored");end.addProperty("inputIdentityRestored",original==mc.player.input);end.addProperty("cameraRestored",camera==mc.options.getCameraType());emit(end);emit(DcVisuals.evidence());if(control!=null)publishControl("restored",mc);finished=true;}return;}
+            // The server may send the return teleport before completing a large block rollback.
+            // While relinquishing ownership, being outside the test area is expected, not a fault.
+            if(released&&restore.get()){if(control!=null)publishControl("releasing",mc);return;}
             if(!enteredTestArea&&phase<0&&mc.player.getY()<195&&++setupWait<100)return;
             if(mc.player.getY()>=195)enteredTestArea=true;
             if(mc.player.getY()<195||mc.player.noPhysics||mc.player.getAbilities().flying||mc.isPaused()){release(mc);failed=true;restore.set(true);return;}
@@ -223,16 +247,29 @@ public final class PhysicsProbe implements ClientModInitializer {
                 if(warm>=10&&!readyReported){var event=sample("client",mc.player);event.addProperty("kind","ready");emit(event);readyReported=true;}
                 if(control!=null&&readyReported){
                     if(camera==null){camera=mc.options.getCameraType();original=mc.player.input;mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);}
-                    control.publish("ready",mc.player.tickCount,mc.player.getX(),mc.player.getY(),mc.player.getZ(),true);
+                    publishControl("ready",mc);
                     if(control.failure()!=null)throw new IllegalStateException(control.failure());
                     if(control.inbox()!=null&&control.inbox().fault()!=null){leaseFault=control.inbox().fault();release(mc);restore.set(true);return;}
                     if(control.requested())start(mc);else return;
                 }else if(readyReported&&begin.get())start(mc);else return;
             }
-            var record=sample("client",mc.player);record.addProperty("held",inbox.held());record.addProperty("consumedInput",inbox.consumedInput());record.addProperty("consumedAck",inbox.consumedAck());record.addProperty("inputIdentityRestored",original==mc.player.input);record.addProperty("fault",inbox.fault());emit(record);
+            if(control!=null&&control.viewControl&&!released){
+                for(int count=0;count<128;count++){var view=control.consumedView();if(view==null)break;
+                    if(view.inventory()){
+                        if(mc.gui.screen()==null){ownedInventory=new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player);mc.gui.setScreen(ownedInventory);}
+                        else if(mc.gui.screen()==ownedInventory){mc.gui.setScreen(null);ownedInventory=null;}
+                        else throw new IllegalStateException("unowned native GUI");
+                    }
+                    if(mc.gui.screen()==null){mc.player.turn(view.x(),view.y());if(view.cycle())mc.options.setCameraType(mc.options.getCameraType().cycle());}
+                    var event=new JsonObject();event.addProperty("kind","view-consumed");event.addProperty("inputSeq",view.inputSeq());event.addProperty("mouseX",view.x());event.addProperty("mouseY",view.y());event.addProperty("cameraCycle",view.cycle());event.addProperty("inventoryCycle",view.inventory());event.addProperty("screen",screenType(mc));event.addProperty("yaw",mc.player.getYRot());event.addProperty("pitch",mc.player.getXRot());event.addProperty("camera",mc.options.getCameraType().name());event.addProperty("nativeTick",mc.player.tickCount);emit(event);
+                }
+            }
+            var record=sample("client",mc.player);record.addProperty("held",inbox.held());record.addProperty("consumedInput",inbox.consumedInput());record.addProperty("consumedAck",inbox.consumedAck());record.addProperty("inputIdentityRestored",original==mc.player.input);record.addProperty("fault",inbox.fault());
+            record.addProperty("screen",screenType(mc));record.addProperty("nativeForward",mc.player.input.keyPresses.forward());record.addProperty("nativeJump",mc.player.input.keyPresses.jump());record.addProperty("nativeMoveX",mc.player.input.getMoveVector().x);record.addProperty("nativeMoveY",mc.player.input.getMoveVector().y);
+            emit(record);
             if(inbox.fault()!=null&&!released){leaseFault=inbox.fault();release(mc);}
             if(control!=null){
-                control.publish(released?"releasing":"active",mc.player.tickCount,mc.player.getX(),mc.player.getY(),mc.player.getZ(),original==mc.player.input);
+                publishControl(released?"releasing":"active",mc);
                 if(released)restore.set(true);
                 if(++phase>=1200){inbox.revoke("bounded-input-lab-end");release(mc);restore.set(true);}
                 return;
@@ -246,12 +283,36 @@ public final class PhysicsProbe implements ClientModInitializer {
             if(++phase>=200){release(mc);restore.set(true);}
         }catch(Exception ex){failed=true;restore.set(true);try{release(mc);}catch(Exception restoreError){LOG.error("MCDN physics input restore failed: {}",restoreError.toString());}LOG.error("MCDN physics client failed: {}",ex.toString());}
     }
+    private static String screenType(Minecraft mc){return mc.gui.screen()==null?"none":mc.gui.screen()==ownedInventory?"inventory":"other";}
+    private static void publishControl(String stage,Minecraft mc){control.publish(stage,mc.player.tickCount,mc.player.getX(),mc.player.getY(),mc.player.getZ(),original==mc.player.input,mc.player.getYRot(),mc.player.getXRot(),mc.options.getCameraType().name(),screenType(mc));}
+    public static void beforeServerStop(MinecraftServer server){
+        if(!configured||serverPlayer==null||serverRestored)return;
+        beginShutdownRestore(server,"server-stop");
+    }
+    public static void beforePlayerRemove(ServerPlayer player){
+        if(!configured||player!=serverPlayer||serverRestored)return;
+        beginShutdownRestore(player.level().getServer(),"player-remove-before-save");
+    }
+    private static void beginShutdownRestore(MinecraftServer server,String trigger){
+        var event=new JsonObject();event.addProperty("kind","shutdown-restore");event.addProperty("trigger",trigger);event.addProperty("phase",phase);event.addProperty("nativeTick",serverPlayer.tickCount);emit(event);
+        // Invoked on the native server shutdown path before vanilla saves the dedicated world.
+        // This also covers closing the lab while waiting for an F7 entry that was refused.
+        if(inbox!=null)inbox.revoke("native-server-stopping");
+        shutdownReturn=true;restore.set(true);serverTick(server);
+        if(!serverRestored)LOG.error("MCDN_NATIVE_WORLD_RESTORE_INCOMPLETE_BEFORE_SAVE; retained lab backup required");
+    }
     public static void serverTick(MinecraftServer server){
         if(!configured||serverPlayer==null)return;
         if(restore.get()&&!serverRestored){
             try{
                 for(var d:displays)d.discard();displays.clear();remove(serverPlayer.level());serverPlayer.setGameMode(returnMode);serverPlayer.setDeltaMovement(Vec3.ZERO);
-                if(!serverPlayer.teleportTo(server.overworld(),returnPosition.x,returnPosition.y,returnPosition.z,Set.of(),returnYaw,returnPitch,false))throw new IllegalStateException("return teleport failed");
+                int cleared=nativeBlocks.size();
+                for(var pos:nativeBlocks)server.overworld().setBlock(pos,Blocks.AIR.defaultBlockState(),3);
+                for(var pos:nativeBlocks)if(!server.overworld().getBlockState(pos).isAir()||server.overworld().getBlockEntity(pos)!=null)throw new IllegalStateException("native block rollback pending");
+                nativeBlocks.clear();
+                if(dcScene!=null&&dcScene.nativeBlocks){var event=new JsonObject();event.addProperty("kind","native-blocks-restored");event.addProperty("blocks",cleared);event.addProperty("remaining",nativeBlocks.size());emit(event);}
+                if(shutdownReturn)serverPlayer.absSnapTo(returnPosition.x,returnPosition.y,returnPosition.z,returnYaw,returnPitch);
+                else if(!serverPlayer.teleportTo(server.overworld(),returnPosition.x,returnPosition.y,returnPosition.z,Set.of(),returnYaw,returnPitch,false))throw new IllegalStateException("return teleport failed");
                 var end=sample("server-restored",serverPlayer);end.addProperty("kind","restored");end.addProperty("gameMode",serverPlayer.gameMode().getName());end.addProperty("remainingFixtureDisplays",displays.size());emit(end);
                 serverRestored=true;LOG.info("MCDN_PHYSICS_SERVER_RESTORED original pose/mode; fixture displays removed");
             }catch(Exception ex){failed=true;if(++restoreAttempts>=3)finished=true;LOG.error("MCDN physics server restore failed attempt {}: {}",restoreAttempts,ex.toString());}return;

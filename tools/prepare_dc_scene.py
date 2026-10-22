@@ -15,7 +15,7 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def prepare(metadata):
+def prepare(metadata, native_blocks=False):
     raw_meta = metadata.read_bytes()
     meta = json.loads(raw_meta)
     name = meta['file']
@@ -36,6 +36,9 @@ def prepare(metadata):
         raise ValueError('DC records digest')
     # Rigid translation only: preserve every ID, cell, gap, thickness and world identity.
     dy = 200.0 - float(meta['mcOriginY'])
+    first=struct.unpack_from('<Q6dII',data,96)
+    dx=math.ceil(first[1])-first[1] if native_blocks else 0
+    dz=math.ceil(first[3])-first[3] if native_blocks else 0
     translated = bytearray(data)
     boxes = []
     for offset in range(96, len(data), 64):
@@ -44,6 +47,10 @@ def prepare(metadata):
             raise ValueError('unsupported shape')
         values[1] += dy
         values[4] += dy
+        for axis,delta in [(0,dx),(2,dz)]:
+            values[axis]+=delta;values[axis+3]+=delta
+        if native_blocks and any(v!=round(v) for v in values):
+            raise ValueError('source is not an exact translated native block grid')
         struct.pack_into('<Q6dII', translated, offset, identity, *values, flags, reserved)
         boxes.append(values)
     translated[56:88] = hashlib.sha256(translated[96:]).digest()
@@ -51,7 +58,7 @@ def prepare(metadata):
     def intersects(x0, y0, z0, x1, y1, z1):
         return any(b[0] < x1 and b[3] > x0 and b[1] < y1 and b[4] > y0 and b[2] < z1 and b[5] > z0 for b in boxes)
 
-    z = float(meta['mcOriginZ'])
+    z = float(meta['mcOriginZ'])+dz
     # Choose a real supported floor and an unmodified two-block-high wall to its right.
     candidates = []
     for b in boxes:
@@ -73,17 +80,21 @@ def prepare(metadata):
     plan = dict(kind='archived-real-dc-solid-scene', sourceMetadataSha256=sha(raw_meta),
                 sourceDigest=sha(data), fixtureSha256=sha(translated), sourceSession=meta['session'],
                 sourceEpoch=meta['worldEpoch'], sourceRevision=meta['revision'], mapUid=meta['MapUid'],
-                translation=[0, dy, 0], shapeCount=count, unsupportedCells=meta['unsupportedCells'],
+                translation=[dx, dy, dz], shapeCount=count, unsupportedCells=meta['unsupportedCells'],
                 spawn=[x,y+.5,z], groundY=y, wallX=wall_x, productionModeGranted=False,
                 inputSource='local-script', note='Archived DC solid subset, rigid translation; not live DC control or complete world semantics')
+    if native_blocks:
+        plan['nativeBlocks']=True
+        plan['nativeBlockCount']=sum(int((b[3]-b[0])*(b[4]-b[1])*(b[5]-b[2])) for b in boxes)
     return raw_meta, data, bytes(translated), plan
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--metadata', type=Path, required=True)
+    parser.add_argument('--native-blocks',action='store_true')
     args = parser.parse_args()
-    raw_meta, source, scene, plan = prepare(args.metadata.resolve())
+    raw_meta, source, scene, plan = prepare(args.metadata.resolve(),args.native_blocks)
     OUT.mkdir(parents=True, exist_ok=True)
     for name, data in [('source.json',raw_meta),('source.mcdw',source),('scene.mcdw',scene)]:
         (OUT/name).write_bytes(data)

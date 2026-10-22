@@ -44,7 +44,7 @@ def main():
     if sha(framejar)!=frame["sha256"]:raise ValueError("known native frame addon required")
     with tempfile.TemporaryDirectory(dir=OUT,prefix='classes-') as temporary:
         classes=Path(temporary);q=lambda v:'"'+str(v).replace('\\','/')+'"'
-        args=OUT/"javac.args";args.write_text('\n'.join(['-encoding','UTF-8','-proc:none','-Xlint:all,-classfile','-Werror','-cp',q(';'.join(map(str,cp))),'-d',q(classes),*map(q,sources)]),encoding='utf-8')
+        args=OUT/"javac.args";args.write_text('\n'.join(['-encoding','UTF-8','-proc:none','-Xlint:all,-classfile','-Werror','-cp',q(';'.join(map(str,[*cp,framejar]))),'-d',q(classes),*map(q,sources)]),encoding='utf-8')
         run([a.java_home/'bin/javac.exe','-J-Duser.language=en','@'+str(args)])
         with ZipFile(jar,'w',ZIP_DEFLATED) as z:
             for path in classes.rglob('*.class'):z.write(path,path.relative_to(classes).as_posix())

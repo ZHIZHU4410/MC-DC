@@ -58,7 +58,10 @@ def main():
     if physics:
         frame=json.loads((game/'mcdn-lab.json').read_text());frame['outputDir']=str(LAB/'observations');(game/'mcdn-lab.json').write_text(json.dumps(frame,indent=2),encoding='utf-8')
         if cfg.get('inputLab'):
-            native=json.loads((game/'mcdn-physics.json').read_text());native['inputManifest']=str(manifest);native['inputManifestSha256']=pointer['sha256'];(game/'mcdn-physics.json').write_text(json.dumps(native,indent=2),encoding='utf-8')
+            native=json.loads((game/'mcdn-physics.json').read_text());native['inputManifest']=str(manifest);native['inputManifestSha256']=pointer['sha256']
+            if bool(native.get('dcVisuals'))!=bool(cfg.get('dcVisuals')):raise ValueError('visual world configuration must match the private input session')
+            if cfg.get('dcVisuals') and native.get('dcVisualsSha256')!=cfg['visualConfigSha256']:raise ValueError('visual configuration digest mismatch')
+            (game/'mcdn-physics.json').write_text(json.dumps(native,indent=2),encoding='utf-8')
     target.write_text(json.dumps(pointer,indent=2),encoding="utf-8");options.write_text("\n".join(rows)+"\n",encoding="utf-8")
     dc=json.loads(spec.read_text());dc["environment"]["MCDN_DC_LIVE_COLOR_MANIFEST"]=str(manifest);dc["environment"]["MCDN_DC_LIVE_COLOR_SHA256"]=pointer["sha256"];spec.write_text(json.dumps(dc,indent=2),encoding="utf-8")
     record.write_text(json.dumps({"target":str(target),"sha256":sha(target),"backup":str(backup),"session":cfg["session"]},indent=2),encoding="utf-8")

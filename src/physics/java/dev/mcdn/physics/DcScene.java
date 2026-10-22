@@ -8,6 +8,8 @@ import java.util.*;
 final class DcScene {
     final double x,y,z,wallX;
     final String sourceDigest;
+    final boolean nativeBlocks;
+    final int nativeBlockCount;
     DcScene(JsonObject plan, World world) {
         if (!plan.get("kind").getAsString().equals("archived-real-dc-solid-scene") ||
             !plan.get("fixtureSha256").getAsString().equals(world.stamp().digest()) ||
@@ -18,6 +20,10 @@ final class DcScene {
             throw new IllegalArgumentException("DC scene identity");
         var spawn=plan.getAsJsonArray("spawn");x=spawn.get(0).getAsDouble();y=spawn.get(1).getAsDouble();z=spawn.get(2).getAsDouble();
         wallX=plan.get("wallX").getAsDouble();sourceDigest=plan.get("sourceDigest").getAsString();
+        nativeBlocks=plan.has("nativeBlocks")&&plan.get("nativeBlocks").getAsBoolean();
+        nativeBlockCount=nativeBlocks?plan.get("nativeBlockCount").getAsInt():0;
+        if(nativeBlockCount<0||nativeBlockCount>20000)throw new IllegalArgumentException("native scene block bound");
+        if(nativeBlocks)for(var b:world.boxes())for(double value:new double[]{b.minX(),b.minY(),b.minZ(),b.maxX(),b.maxY(),b.maxZ()})if(value!=Math.rint(value))throw new IllegalArgumentException("exact native block grid required");
         if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(z)||!Double.isFinite(wallX)||y!=200.5||wallX-x<3||wallX-x>7)
             throw new IllegalArgumentException("DC corridor bounds");
         for(var b:world.boxes())if(b.minY()<170||b.maxY()>230)throw new IllegalArgumentException("scene must be above native terrain");

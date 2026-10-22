@@ -1,5 +1,25 @@
 # 原生 MC/DC 桥接工程日志
 
+2026-10-21 本轮继续：用户明确限定可见 MC 元素为 UI、手臂、装备，其余需为 DC。使用 mod-any-game/mashup-mods/game-automation，并为原素材读取转换使用 reverse-engineering/asset-pipeline。无可用历史聊天工具，依工程文档与上次归档接续。用本机官方 PAKTool/AtlasTool 展开 res.pak 与 prison 图集，素材均在本轮 visualization 根的 dc-private-assets 工程外目录；未重新分发。20 张原始 24x24 墙面/地面材质生成10个有完整六面的原生方块模型，使用原有 stone 碰撞载体，资源包在工程外 dc-private-pack。转换器校验 scene digest/26.3 pack97.1，prison 主题雾/ambient取自本机data.cdb；不声称逐格原装饰或敌人同步。
+
+新增 DcVisuals 及四类原生渲染钩子：GameRenderer.extract后清除原生世界实体/天气/粒子；独立拦截 SkyRenderer.render 和两个 CloudRenderer pass；FogRenderer.setupFog 返回DC雾。原生手臂和GUI对象不动，环境光覆盖仅本次提取状态，释放强制下一次原生lightmap更新；第三人称MC身体剔除，DC角色/装备世界显示尚未实现。进入前核验私有资源包摘要及最高优先级资源来源；DC NativeWorldGuard 逐输入验证当前 biome.atlasName=prison。FrameProbe 捕获时冻结worldVisuals标签，回调若外观状态改变丢弃该帧；视觉会话最大边1024。私有会话扩展，不授予生产MODE。
+
+Java25沙箱内无法加载自身java.security，沙箱外同一命令通过；未修改JDK配置。实际Knot/Mixin九类加载检查及原生渲染状态夹具通过（世界实体剔除、手臂/GUI引用、RGB顺序、释放、两种云pass）；没有用此冒充GPU实测。DC native预检Exit0/缺加载器Exit2；旧库存会话5e8efaec独立复核通过。资源包确定性重复生成通过。新增安装/恢复工具仅操作已标记MC-DC-Physics独立实例并备份配置，资源包副本保留工程外。
+
+已替换DC自有包（备份20261021T112225681851Z-dc-frame-replace）与独立MC包/场景（完整存档备份20261021T112317269505Z-dc-scene）；视觉配置备份20261021T112318238856Z-dc-visuals。首轮会话33a3b220-0ad3-436b-90d4-c1e69b10616e、MC PID46204/创建ns1792581852665805900，启动器目视离线且选中MC-DC-Physics；MC日志确认加载private pack。尚未进入单人世界，未创建原生方块或接管Hero。Steam当前在线，正常菜单“进入离线模式”尚未成功点击；Windows工具连续USER_CONTROL/CONTROL_UNAVAILABLE，已发异步请求放开键鼠，没有用shell绕过输入保护。DC未正式启动；新GPU/DC显示/F7尚未验收。来源/状态见docs/DC_VISUAL_WORLD_SLICE.md；完整目标仍未完成。
+
+2026-10-21 19:02：完成原生库存开关与输入隔离切片后按用户要求停止。会话5e8efaec-2655-4515-bd4d-cfdfa28ad03a，DC38484/MC43652。修正26.3 GUI入口为Minecraft.gui.screen()/setScreen()；真实InventoryScreen由E边沿开启/关闭，界面期间BridgeClientInput仍消费协议但过滤全部移动，F7只关闭自己持有的界面。186发送/185消费、末尾1条全零被RELEASE取消；3个E边沿、16个held17但原生移动0/位置不变采样、12个库存前台帧；254上传/255发布配对，212/211原生轨迹、墙接触56/56、跳峰201.2522、诊断查询0。10060方块回滚、两端恢复确认、双Exit0、配置解除、私有会话停止。实际窗口图像目视通过，独立check_native_input_lab通过；构建/原生类型/世界夹具及正反启动门禁通过。详见docs/NATIVE_INVENTORY_SLICE.md。只完成库存开关显示，尚未接槽位操作/挖放/战斗/双向世界编辑，生产生命周期仍未验收。GitHub未再次推送。
+
+2026-10-21 16:05最新：61390041正常回归通过：135发送/134消费，末尾1条全零快照由RELEASE取消，原生ACK137确认取消前缀；134视角记录、三种相机、244上传/245发布匹配、36接管前台帧、156/155原生轨迹、墙接触54/54、跳峰201.2522，诊断查询0。当前MapUid及实体掩码每条输入核验，F7确认恢复与10060块回滚、双Exit0、配置/邮箱解除。1944d930错误MapUid582915对实际582914被拒，输入0/Hero未接管；正常关闭由server-stop保存前兜底清块和原生实体原位恢复。随后同存档原样重载61390041，实际原位Y=-60、生命20/survival/grounded、10060目标空气预检均通过。verify_reloaded_world可独立验证两次归档链。
+
+正常关闭反例839bc2a6揭示断连后网络传送失败跳过清理，保留失败存档并从运行前备份精确恢复36文件；修复为清理先行，关闭用原生absSnapTo恢复待保存位置，正常F7保留网络传送。player-remove及server-stop两个钩子Knot变换通过，实际反例触发server-stop；不冒充另一路径已实测。端口预选竞争d548b059及准备等待超时5f4d5eb0保留未授予控制证据，改由DC绑定0端口发布实际私有端点并把准备等待设为10分钟；活动输入租约仍250ms。未新增推送。后续仍需实时几何版本/双向编辑/库存/敌人与唯一伤害源，及失焦/断连/切关/崩溃专项验收。
+
+2026-10-21 14:54 当前：用户授权以单提交替换GitHub当前内容，唯一一次推送c03f316795799f950aecf4016563017363896fa5，远程main读回一致；旧历史bundle留本地。后续未再推送。164个源码/文档/工具文件排除游戏/反编译/存档/日志/私有会话；串行protocol/control/world/pipeline回归通过。
+
+真实前台输入cf9f43fa通过：85条输入、100/99原生采样、285上传，Hero不动、Game不暂停、两端恢复确认。鼠标/F5 3f3038f3通过：136输入/视角逐序号消费，三个原生相机、78.45°偏航/28.65°俯仰、166/166帧配对。原生方块世界6c51fbaa通过：2515真实DC实体格精确平移落为10060原生块，无显示体和碰撞替换层，双侧查询0、156/155轨迹、墙接触55/55、跳峰201.2522；136输入/视角、252/252GPU与DC上传、36前台活动帧。全部方块回滚、MC输入/相机/原位/模式及DC原Hero恢复，双进程Exit0，配置/邮箱解除。详见docs/NATIVE_BLOCK_WORLD.md。失败9b070edf（回滚传送竞态）和62834cf9（观测共享冲突）保留not-accepted，修复后完整重跑通过。
+
+DCCM已更新至35.14.1及新GameProxy，旧指纹正确拒绝启动。重新构建引用/自有包，移除已不存在的广播钩子依赖，使用最早/末尾Module守卫；完整备份后仅更新私有实验缓存/包，新版VM正反预检通过。实时DC格网身份守卫和MC保存前回滚钩子继续实施；库存/挖放、DC敌人双向伤害、切关/断连/失焦专项验收及生产MODE尚未完成。
+
 2026-10-21 09:44 当前：合并显示43帧及Hero旁路前置验证通过，详见docs/COMBINED_SCENE_SLICE.md。最终合并会话5a49540a-3258-4260-bd56-be37a17b774b（DC8060/MC41192），43张真实GPU/原生DC上传匹配、24次DC前台背景推进样本，MC实际归档DC几何200/199轨迹、走跳/墙限位/恢复通过；全窗口目视/停供撤图/正常退出/归档独立复核通过。初轮40帧截图裁切来自Python窗口GetWindowRect未设150%DPI感知，已修正，不当成原生缩放失败；增加原生逆变换并读回scene/window/local2538x1546 scale1证据。底部任务栏遮挡窄条、夜间暗/低分辨率限制保留。临时会话指针/环境均解除，辅助进程停止。
 
 继续推进Hero职责入口：先Game.paused独立校准ff20c41a 120帧/键盘挑战/恢复通过但会冻结世界而不采用。选择性Hero资格校准6b6b231d PID19028通过：仅自有原Hero isFreeze=true/isAlwaysUpdated=false，native canUpdate拒绝；120帧Game.paused=false，Hero坐标/生命不变，Hero资格查询213、其他实体允许资格1042；两个标记原值恢复，Exit0。代码仍为有界独立前置探针，不是MC控制/F7/伤害旁路完成。原生伪代码.bc生成体的近似表达式不能当准确源码；私有反编译在Temp，未进工程。通过实际native值与查询/输入挑战判定。
