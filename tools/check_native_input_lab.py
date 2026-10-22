@@ -25,8 +25,23 @@ def check(run):
         if not path.is_relative_to(run.resolve()) or sha(path) != digest:
             raise ValueError('archive drift: '+name)
     meta = json.loads((run/'identity.json').read_text())
-    if any(v != 0 for v in meta['exitCodes'].values()):
+    codes = meta['exitCodes']
+    if set(codes) != {'dc', 'mc'} or any(v not in (0, None) for v in codes.values()):
         raise ValueError('normal game exits required')
+    exit_evidence = 'both-exit-codes-zero'
+    if any(v is None for v in codes.values()):
+        # Windows releases a process object after every handle closes. A later
+        # archive cannot recover its numeric exit code; require each game's
+        # terminal log and keep this weaker evidence visible in the report.
+        dc_log = (run/'dc-runtime.log').read_text(errors='replace')
+        mc_log = (run/'mc-runtime.log').read_text(errors='replace')
+        if ('session="'+meta['session']+'"' not in dc_log or
+            'Game is exiting' not in dc_log or
+            'MCDN_NATIVE_INPUT_LAB_HERO_RESTORED' not in dc_log or
+            'MCDN_PHYSICS_SERVER_RESTORED' not in mc_log or
+            'Stopping server' not in mc_log or 'Saving worlds' not in mc_log):
+            raise ValueError('terminal game logs required when exit code is unavailable')
+        exit_evidence = 'terminal-logs-exit-code-unavailable'
     with zipfile.ZipFile(run/'sources.zip') as sources:
         for name in ['mc-build.json', 'frame-build.json', 'dc-build.json', 'guard-build.json']:
             build = json.loads((run/name).read_text())
@@ -177,7 +192,7 @@ def check(run):
         if len(gui_frames)<2 or states[-1].get('Screen')!='none' or not (run/'input-inventory.png').is_file():
             raise ValueError('foreground native GUI frame delivery/recovery')
         inventory_report=dict(eEdges=3,blockedNativeSamples=len(blocked),foregroundGuiFrames=len(gui_frames),closedOnF7=True)
-    return dict(status='native-dc-block-world-pass' if native_blocks else 'native-dc-foreground-view-pass' if view_report else 'native-dc-foreground-input-pass', session=meta['session'], inputsSent=len(host),inputsConsumed=consumed,cancelledNeutralTail=len(cancelled),heroUid=hero['Uid'], heroUnchanged=True, nativeRestored=True, dcRestored=True, producerFrames=len(producers), uploadedFrames=len(consumers), activeForegroundFrames=len({s['consumer']['frameId'] for s in active}), summaries=summaries, viewControl=view_report, inventoryControl=inventory_report, nativeBlocks=scene.get('nativeBlockCount',0), productionModeGranted=False)
+    return dict(status='native-dc-block-world-pass' if native_blocks else 'native-dc-foreground-view-pass' if view_report else 'native-dc-foreground-input-pass', session=meta['session'], exitEvidence=exit_evidence, inputsSent=len(host),inputsConsumed=consumed,cancelledNeutralTail=len(cancelled),heroUid=hero['Uid'], heroUnchanged=True, nativeRestored=True, dcRestored=True, producerFrames=len(producers), uploadedFrames=len(consumers), activeForegroundFrames=len({s['consumer']['frameId'] for s in active}), summaries=summaries, viewControl=view_report, inventoryControl=inventory_report, nativeBlocks=scene.get('nativeBlockCount',0), productionModeGranted=False)
 
 
 def main():
