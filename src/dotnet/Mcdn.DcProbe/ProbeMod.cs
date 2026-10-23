@@ -14,8 +14,8 @@ namespace Mcdn.DcProbe;
 // Capture is read-only. The explicitly isolated DC lab additionally redirects saves and blocks Cloud.
 public sealed class ProbeMod(ModInfo info) : ModBase(info), IOnHeroInit, IOnHeroDispose, IOnHeroUpdate, IOnGameExit
 {
-    private sealed record Capture(ulong Epoch, int MapUid, int X, int Y, int Width, int Height, int[] Cells,
-        double AnchorX, double AnchorY, double HeroX, double HeroY);
+    private sealed record Capture(ulong Epoch, int MapUid, int MapWidth, int MapHeight, int X, int Y, int Width, int Height,
+        int[] Cells, int[]? DecoFlags, int[]? RoomCells, double AnchorX, double AnchorY, double HeroX, double HeroY);
     private readonly Channel<Capture> captures = Channel.CreateBounded<Capture>(new BoundedChannelOptions(1)
         { FullMode = BoundedChannelFullMode.DropOldest, SingleWriter = true, SingleReader = true });
     private readonly Guid session = Guid.NewGuid();
@@ -25,6 +25,7 @@ public sealed class ProbeMod(ModInfo info) : ModBase(info), IOnHeroInit, IOnHero
     private nint collisionPointer;
     private double anchorX, anchorY;
     private long next;
+    private bool spatialWarningLogged;
     private Task? writer;
     private double mcOriginX,mcOriginY,mcOriginZ;
     internal static bool IsInitialized { get; private set; }
@@ -62,7 +63,30 @@ public sealed class ProbeMod(ModInfo info) : ModBase(info), IOnHeroInit, IOnHero
             int x = Math.Clamp(hero.cx - 32, 0, Math.Max(0, wid - 64)), y = Math.Clamp(hero.cy - 24, 0, Math.Max(0, hei - 48));
             int w = Math.Min(64, wid - x), h = Math.Min(48, hei - y); var cells = new int[w * h];
             for (int row = 0; row < h; row++) Marshal.Copy(map.collisions.bytes + checked(((y+row)*wid+x)*4), cells, row*w, w);
-            captures.Writer.TryWrite(new(epoch, mapUid, x, y, w, h, cells, anchorX, anchorY, hero.cx+hero.xr, hero.cy+hero.yr));
+            int[]? decoFlags = null, roomCells = null;
+            // These are DC's own spatial labels, not rendered decoration sprites or interpreted door semantics.
+            try
+            {
+                var deco = map.decoGrid; var rooms = map.cellToRoom;
+                if (deco != null && rooms != null && deco.bytes != 0 && rooms.bytes != 0 &&
+                    deco.length >= (long)wid * hei && rooms.length >= (long)wid * hei)
+                {
+                    decoFlags = new int[w*h]; roomCells = new int[w*h];
+                    for (int row = 0; row < h; row++)
+                    {
+                        int offset = checked(((y+row)*wid+x)*4);
+                        Marshal.Copy(deco.bytes + offset, decoFlags, row*w, w);
+                        Marshal.Copy(rooms.bytes + offset, roomCells, row*w, w);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!spatialWarningLogged) { Logger.Warning("MCDN optional spatial layers unavailable: {Message}",ex.Message);spatialWarningLogged=true; }
+                decoFlags=null;roomCells=null;
+            }
+            captures.Writer.TryWrite(new(epoch, mapUid, wid, hei, x, y, w, h, cells, decoFlags, roomCells,
+                anchorX, anchorY, hero.cx+hero.xr, hero.cy+hero.yr));
         }
         catch (Exception ex) { Logger.Warning("MCDN capture refused: {Message}", ex.Message); }
     }
@@ -73,8 +97,21 @@ public sealed class ProbeMod(ModInfo info) : ModBase(info), IOnHeroInit, IOnHero
         {
             await foreach (var capture in captures.Reader.ReadAllAsync())
             {
+                byte[]? layout = null;
+                if (capture.DecoFlags != null && capture.RoomCells != null)
+                {
+                    using var stream = new MemoryStream();
+                    using (var writer = new BinaryWriter(stream, System.Text.Encoding.ASCII, leaveOpen:true))
+                    {
+                        writer.Write(System.Text.Encoding.ASCII.GetBytes("MCDL"));writer.Write(1);
+                        foreach (int value in new[]{capture.MapUid,capture.MapWidth,capture.MapHeight,capture.X,capture.Y,capture.Width,capture.Height}) writer.Write(value);
+                        foreach (var grid in new[]{capture.Cells,capture.DecoFlags,capture.RoomCells})
+                            foreach (int value in grid) writer.Write(value);
+                    }
+                    layout=stream.ToArray();
+                }
                 var raw = MemoryMarshal.AsBytes(capture.Cells.AsSpan()).ToArray();
-                string hash = Convert.ToHexStringLower(SHA256.HashData(raw)) + $":{capture.X}:{capture.Y}";
+                string hash = Convert.ToHexStringLower(SHA256.HashData(layout ?? raw)) + $":{capture.X}:{capture.Y}:{capture.MapUid}";
                 if (previousEpoch == capture.Epoch && previousHash == hash) continue;
                 if (previousEpoch != capture.Epoch) revision = 0;
                 revision++; previousEpoch = capture.Epoch; previousHash = hash;
@@ -89,9 +126,18 @@ public sealed class ProbeMod(ModInfo info) : ModBase(info), IOnHeroInit, IOnHero
                 }
                 var world = World.Create(session,capture.Epoch,revision,boxes); string name=$"world-{capture.Epoch}-{revision}.mcdw";
                 await File.WriteAllBytesAsync(Path.Combine(output!,name), world.Encode());
+                string? layoutName = null, layoutDigest = null;
+                if (layout != null)
+                {
+                    layoutName = $"layout-{capture.Epoch}-{revision}.mcdl";
+                    layoutDigest = Convert.ToHexStringLower(SHA256.HashData(layout));
+                    await File.WriteAllBytesAsync(Path.Combine(output!,layoutName),layout);
+                }
                 // Immutable blob first; pointer/metadata last. A reader must validate its digest.
                 var metadata = new { kind="read-only-dc-probe", session, worldEpoch=capture.Epoch.ToString(), revision=revision.ToString(),
-                    file=name, digest=world.Digest, capture.MapUid, capture.X,capture.Y,capture.Width,capture.Height,
+                    file=name, digest=world.Digest, capture.MapUid,capture.MapWidth,capture.MapHeight,
+                    capture.X,capture.Y,capture.Width,capture.Height, layoutFile=layoutName,layoutDigest,
+                    spatialLayersAvailable=layout!=null,
                     capture.AnchorX,capture.AnchorY,capture.HeroX,capture.HeroY, histogram, unsupportedCells=unsupported,
                     mcOriginX,mcOriginY,mcOriginZ,
                     eligibleForControl=false, note="diagnostic solid subset; one-way/roll/ladder/slope and full world safety not implemented" };
