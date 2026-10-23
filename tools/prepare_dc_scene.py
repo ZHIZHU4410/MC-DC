@@ -6,6 +6,10 @@ import math
 from pathlib import Path
 import struct
 import uuid
+if __package__:
+    from .verify_dc_layout import verify as verify_spatial_layers
+else:
+    from verify_dc_layout import verify as verify_spatial_layers
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'artifacts/dc-scene'
@@ -18,6 +22,7 @@ def sha(data):
 def prepare(metadata, native_blocks=False):
     raw_meta = metadata.read_bytes()
     meta = json.loads(raw_meta)
+    spatial = verify_spatial_layers(metadata) if meta.get('spatialLayersAvailable') else None
     name = meta['file']
     if Path(name).name != name or not name.endswith('.mcdw'):
         raise ValueError('local immutable world filename required')
@@ -83,6 +88,10 @@ def prepare(metadata, native_blocks=False):
                 translation=[dx, dy, dz], shapeCount=count, unsupportedCells=meta['unsupportedCells'],
                 spawn=[x,y+.5,z], groundY=y, wallX=wall_x, productionModeGranted=False,
                 inputSource='local-script', note='Archived DC solid subset, rigid translation; not live DC control or complete world semantics')
+    if spatial:
+        plan['sourceSpatialLayerSha256'] = spatial['layoutDigest']
+        plan['sourceSpatialLayerValues'] = {'decoFlags': spatial['decoFlagValues'], 'roomCells': spatial['roomCellValues']}
+        plan['sourceMapSize'] = spatial['mapSize']
     if native_blocks:
         plan['nativeBlocks']=True
         plan['nativeBlockCount']=sum(int((b[3]-b[0])*(b[4]-b[1])*(b[5]-b[2])) for b in boxes)
@@ -98,6 +107,8 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for name, data in [('source.json',raw_meta),('source.mcdw',source),('scene.mcdw',scene)]:
         (OUT/name).write_bytes(data)
+    if plan.get('sourceSpatialLayerSha256'):
+        (OUT/'source.mcdl').write_bytes((args.metadata.resolve().parent/json.loads(raw_meta)['layoutFile']).read_bytes())
     (OUT/'scene.json').write_text(json.dumps(plan,indent=2),encoding='utf-8')
     print('DC_SCENE_PREPARED',json.dumps(plan))
 
