@@ -12,6 +12,8 @@ def main():
     meta=json.loads((OUT/'source.json').read_text())
     if sha(source)!=plan['sourceDigest'] or sha(scene)!=plan['fixtureSha256'] or sha((OUT/'source.json').read_bytes())!=plan['sourceMetadataSha256']:
         raise ValueError('provenance hashes')
+    if plan.get('sourceSpatialLayerSha256') and sha((OUT/'source.mcdl').read_bytes())!=plan['sourceSpatialLayerSha256']:
+        raise ValueError('DC spatial layer provenance')
     if source[:56]!=scene[:56] or source[88:96]!=scene[88:96]:
         raise ValueError('world identity/layout changed')
     count=struct.unpack_from('<I',source,12)[0]
@@ -23,6 +25,8 @@ def main():
     with tempfile.TemporaryDirectory(dir=OUT) as directory:
         directory=Path(directory);metadata=directory/'latest.json';blob=directory/meta['file']
         metadata.write_bytes((OUT/'source.json').read_bytes());blob.write_bytes(source)
+        if plan.get('sourceSpatialLayerSha256'):
+            (directory/meta['layoutFile']).write_bytes((OUT/'source.mcdl').read_bytes())
         if prepare(metadata,plan.get('nativeBlocks',False))[2:]!=(scene,plan):raise ValueError('nonreproducible scene plan')
         bad_cases=[dict(meta,file='../outside.mcdw'),dict(meta,digest='0'*64)]
         for bad in bad_cases:
